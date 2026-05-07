@@ -170,13 +170,16 @@ jobs:
           }
 
           # Send first alert immediately
-          send_telegram "🚨 *IN STOCK NOW!*
+          MSG="🚨 *IN STOCK NOW!*"$'\n\n'"*$PRODUCT_NAME* is available!"$'\n\n'"👉 [Order here]($PRODUCT_URL)"$'\n\n'"_Reply *STOP* to stop these alerts._"
+          send_telegram "$MSG"
+          # send_telegram "🚨 *IN STOCK NOW!*
+          
+          # *$PRODUCT_NAME* is available!
+          
+          # 👉 [Order here]($PRODUCT_URL)
+          
+          # _Reply *STOP* to stop these alerts._"
 
-*$PRODUCT_NAME* is available!
-
-👉 [Order here]($PRODUCT_URL)
-
-_Reply *STOP* to stop these alerts._"
 
           echo "✅ First Telegram message sent."
 
@@ -189,24 +192,17 @@ _Reply *STOP* to stop these alerts._"
 
             if [ "$STOP_CHECK" = "yes" ]; then
               echo "🛑 STOP received from user after $ITERATION alerts. Stopping."
+              MSG="✅ *Alerts stopped.*"$'\n\n'"You typed STOP — no more notifications."$'\n\n'"Visit your dashboard to restart monitoring when needed."$'\n'"👉 $VERCEL_URL"
+              send_telegram "$MSG"
               send_telegram "✅ *Alerts stopped.*
-
-You typed STOP — no more notifications.
-
-Visit your dashboard to restart monitoring when needed.
-👉 $VERCEL_URL"
               STOPPED=true
               break
             fi
 
             # Send next alert
             MINS_LEFT=$((( (MAX_ITERATIONS - ITERATION) * 10 ) / 60))
-            send_telegram "🚨 *Still in stock!* (alert #$((ITERATION + 1)))
-
-*$PRODUCT_NAME* — go order now!
-👉 [Order here]($PRODUCT_URL)
-
-_Reply *STOP* to stop · Auto-stops in ~${MINS_LEFT}m_"
+            MSG="🚨 *Still in stock!* (alert #$((ITERATION + 1)))"$'\n\n'"*$PRODUCT_NAME* — go order now!"$'\n'"👉 [Order here]($PRODUCT_URL)"$'\n\n'"_Reply *STOP* to stop · Auto-stops in ~${MINS_LEFT}m_"
+            send_telegram "$MSG"
 
             echo "Sent alert #$((ITERATION + 1))"
           done
@@ -214,10 +210,8 @@ _Reply *STOP* to stop · Auto-stops in ~${MINS_LEFT}m_"
           # If loop ended naturally (not by STOP)
           if [ "$STOPPED" = "false" ]; then
             echo "⏱ 30-minute limit reached. Stopping alerts automatically."
-            send_telegram "⏱ *Auto-stopped after 30 minutes.*
-
-Alerts have been paused. Visit your dashboard to check current stock status and restart monitoring.
-👉 $VERCEL_URL"
+            MSG="⏱ *Auto-stopped after 30 minutes.*"$'\n\n'"Alerts have been paused. Visit your dashboard to check current stock status and restart monitoring."$'\n'"👉 $VERCEL_URL"
+            send_telegram "$MSG"
           fi
 
           # ── STEP 5: Disable this workflow ───────────────────────────────
