@@ -51,8 +51,10 @@ export default async function handler(req) {
     );
     if (res.ok) {
       const html = (await res.text()).toLowerCase();
-      if (html.includes("order now"))  stockStatus = "in_stock";
-      else if (html.includes("notify me")) stockStatus = "out_of_stock";
+      // if (html.includes("order now"))  stockStatus = "in_stock";
+      // else if (html.includes("notify me")) stockStatus = "out_of_stock";
+      if (html.includes("notify me"))       stockStatus = "out_of_stock";
+      else if (html.includes("order now")) stockStatus = "in_stock";
     }
   } catch (_) {
     stockStatus = "error";
