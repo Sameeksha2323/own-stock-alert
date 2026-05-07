@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>OWN Stock Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:        #f5f2eb;
+    --surface:   #ffffff;
+    --ink:       #1a1814;
+    --muted:     #9a9488;
+    --border:    #e2ddd4;
+    --green:     #1a6b3c;
+    --green-bg:  #edf7f1;
+    --green-br:  #a8d9bc;
+    --red:       #b83232;
+    --red-bg:    #fdf0f0;
+    --red-br:    #f0c0c0;
+    --amber:     #a05c10;
+    --amber-bg:  #fef8f0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 2rem 1rem;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, #c8c2b4 1px, transparent 1px);
+    background-size: 28px 28px;
+    opacity: .35; pointer-events: none; z-index: 0;
+  }
+
+  .wrap {
+    position: relative; z-index: 1;
+    width: 100%; max-width: 460px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+
+  .eyebrow {
+    font-size: 10px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--muted);
+    text-align: center; margin-bottom: 2px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.75rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,.04);
+    animation: rise .4s cubic-bezier(.22,1,.36,1) both;
+  }
+  .card:nth-child(2){ animation-delay:.05s }
+  .card:nth-child(3){ animation-delay:.10s }
+  .card:nth-child(4){ animation-delay:.15s }
+  @keyframes rise {
+    from{ opacity:0; transform:translateY(10px) }
+    to  { opacity:1; transform:none }
+  }
+
+  /* Product */
+  .product-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: 24px; line-height: 1.2;
+    letter-spacing: -.01em; margin-bottom: 3px;
+  }
+  .product-url { font-size: 10px; color: var(--muted); letter-spacing:.04em; margin-bottom: 1.5rem; }
+
+  /* Stock pill */
+  .stock-pill {
+    display: flex; align-items: center; gap: 10px;
+    padding: 13px 15px; border-radius: 10px;
+    border: 1px solid transparent; transition: all .35s;
+    margin-bottom: 1.25rem;
+  }
+  .stock-pill.in_stock    { background:var(--green-bg); border-color:var(--green-br); }
+  .stock-pill.out_of_stock{ background:var(--red-bg);   border-color:var(--red-br); }
+  .stock-pill.unknown,
+  .stock-pill.error       { background:#f7f5f0; border-color:var(--border); }
+
+  .pill-dot {
+    width:10px; height:10px; border-radius:50%; flex-shrink:0; transition:background .35s;
+  }
+  .in_stock     .pill-dot { background:var(--green); animation:blink 2s ease-in-out infinite; }
+  .out_of_stock .pill-dot { background:var(--red); }
+  .unknown      .pill-dot,
+  .error        .pill-dot { background:var(--muted); }
+  @keyframes blink{ 0%,100%{opacity:1} 50%{opacity:.2} }
+
+  .pill-text { flex:1; }
+  .pill-label { font-size:14px; font-weight:500; line-height:1; margin-bottom:3px; letter-spacing:-.01em; }
+  .in_stock     .pill-label { color:var(--green); }
+  .out_of_stock .pill-label { color:var(--red); }
+  .unknown      .pill-label,
+  .error        .pill-label { color:var(--muted); }
+  .pill-sub  { font-size:11px; color:var(--muted); }
+
+  /* Monitor badge */
+  .monitor-badge {
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+    padding:4px 10px; border-radius:99px; border:1px solid var(--border);
+    color:var(--muted); margin-bottom:1.25rem; transition:all .3s;
+  }
+  .monitor-badge.active  { background:var(--green-bg); border-color:var(--green-br); color:var(--green); }
+  .monitor-badge.disabled{ background:#f7f5f0; }
+  .monitor-badge-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .monitor-badge.active .monitor-badge-dot { animation:blink 1.5s infinite; }
+
+  /* Buttons */
+  .btn-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .btn {
+    font-family:'DM Mono',monospace; font-size:12px; letter-spacing:.05em;
+    padding:12px 16px; border-radius:10px; border:1px solid var(--border);
+    cursor:pointer; transition:all .15s ease; text-transform:uppercase;
+    display:flex; align-items:center; justify-content:center; gap:7px;
+  }
+  .btn:hover:not(:disabled){ transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,.08); }
+  .btn:active:not(:disabled){ transform:translateY(0); }
+  .btn:disabled{ opacity:.35; cursor:not-allowed; }
+  .btn-start{ background:var(--ink); color:#f5f2eb; border-color:var(--ink); }
+  .btn-stop { background:var(--surface); color:var(--red); border-color:var(--red-br); }
+  .btn-stop:hover:not(:disabled){ background:var(--red-bg); }
+
+  .spinner{
+    width:12px; height:12px; border:1.5px solid currentColor;
+    border-top-color:transparent; border-radius:50%;
+    animation:spin .6s linear infinite; display:none;
+  }
+  .btn.loading .spinner{ display:block; }
+  .btn.loading .btn-icon{ display:none; }
+  @keyframes spin{ to{transform:rotate(360deg)} }
+
+  /* Meta */
+  .meta-row{
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:10px; color:var(--muted);
+    padding-top:1rem; border-top:1px solid var(--border); margin-top:1rem;
+  }
+  .meta-row a{ color:var(--muted); text-decoration:underline; }
+
+  /* Info card */
+  .info-card { background:#f7f5f0; }
+  .info-title { font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); margin-bottom:.75rem; }
+  .info-row {
+    display:flex; gap:10px; align-items:flex-start;
+    font-size:11px; color:var(--ink); margin-bottom:.5rem; line-height:1.5;
+  }
+  .info-row:last-child{ margin-bottom:0; }
+  .info-icon{ flex-shrink:0; font-size:14px; }
+
+  /* Log card */
+  .log-title { font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); margin-bottom:.75rem; }
+  .log-list{
+    display:flex; flex-direction:column; gap:5px;
+    max-height:150px; overflow-y:auto;
+  }
+  .log-list::-webkit-scrollbar{ width:3px; }
+  .log-list::-webkit-scrollbar-thumb{ background:var(--border); border-radius:2px; }
+  .log-entry{ font-size:11px; color:var(--muted); display:flex; gap:10px; }
+  .log-time { flex-shrink:0; opacity:.6; }
+  .log-entry.ok   .log-msg{ color:var(--green); }
+  .log-entry.err  .log-msg{ color:var(--red); }
+  .log-entry.info .log-msg{ color:var(--ink); }
+
+  /* Toast */
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(8px);
+    background:var(--ink); color:#f5f2eb; font-size:12px; letter-spacing:.04em;
+    padding:10px 20px; border-radius:99px; opacity:0; transition:all .25s ease;
+    pointer-events:none; white-space:nowrap; z-index:99;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .toast.error{ background:var(--red); }
+
+  /* Confetti */
+  @keyframes confetti-fall{
+    to{ transform:translateY(110vh) rotate(720deg); opacity:0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">OWN Stock Monitor</p>
+
+  <!-- MAIN CARD -->
+  <div class="card">
+    <div class="product-title">Plant Protein Powder<br/>Coffee · 1kg</div>
+    <div class="product-url">onlywhatsneeded.in</div>
+
+    <div class="stock-pill unknown" id="stock-pill">
+      <div class="pill-dot"></div>
+      <div class="pill-text">
+        <div class="pill-label" id="stock-label">Checking…</div>
+        <div class="pill-sub"   id="stock-sub">Fetching live status</div>
+      </div>
+    </div>
+
+    <div class="monitor-badge" id="monitor-badge">
+      <div class="monitor-badge-dot"></div>
+      <span id="monitor-label">Loading…</span>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-start" id="btn-start" onclick="control('enable')" disabled>
+        <div class="spinner"></div>
+        <span class="btn-icon">▶</span>
+        Start Monitoring
+      </button>
+      <button class="btn btn-stop" id="btn-stop" onclick="control('disable')" disabled>
+        <div class="spinner"></div>
+        <span class="btn-icon">■</span>
+        Stop Monitoring
+      </button>
+    </div>
+
+    <div class="meta-row">
+      <span id="last-checked">—</span>
+      <a href="https://onlywhatsneeded.in/product/plant-coffee-1kg" target="_blank">Open product ↗</a>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS CARD -->
+  <div class="card info-card">
+    <div class="info-title">How alerts work</div>
+    <div class="info-row">
+      <span class="info-icon">⏱</span>
+      <span>Checks the product page <strong>every minute</strong> while monitoring is active</span>
+    </div>
+    <div class="info-row">
+      <span class="info-icon">📧</span>
+      <span>Sends you <strong>one email</strong> the moment it goes in stock</span>
+    </div>
+    <div class="info-row">
+      <span class="info-icon">📱</span>
+      <span>Sends <strong>Telegram pings every 10 seconds</strong> until you reply <strong>STOP</strong> to the bot (or 30 min auto-cutoff)</span>
+    </div>
+    <div class="info-row">
+      <span class="info-icon">🔒</span>
+      <span>Monitoring <strong>pauses itself</strong> after alerts end — restart anytime with the button above</span>
+    </div>
+  </div>
+
+  <!-- LOG CARD -->
+  <div class="card">
+    <div class="log-title">Activity log</div>
+    <div class="log-list" id="log-list">
+      <div class="log-entry">
+        <span class="log-time">--:--:--</span>
+        <span class="log-msg">Initialising…</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const POLL_MS = 30_000;
+  const logs = [];
+  let prevStockStatus = null;
+  let controlBusy = false;
+
+  function addLog(msg, type = "") {
+    const t = new Date().toLocaleTimeString("en-IN", { hour12: false });
+    logs.unshift({ t, msg, type });
+    if (logs.length > 60) logs.pop();
+    document.getElementById("log-list").innerHTML = logs
+      .map(l => `<div class="log-entry ${l.type}">
+        <span class="log-time">${l.t}</span>
+        <span class="log-msg">${l.msg}</span>
+      </div>`).join("");
+  }
+
+  function showToast(msg, isError = false) {
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.className = "toast show" + (isError ? " error" : "");
+    setTimeout(() => el.className = "toast", 3000);
+  }
+
+  function timeAgo(iso) {
+    if (!iso) return "—";
+    const s = Math.floor((Date.now() - new Date(iso)) / 1000);
+    if (s < 60)   return `${s}s ago`;
+    if (s < 3600) return `${Math.floor(s/60)}m ago`;
+    return `${Math.floor(s/3600)}h ago`;
+  }
+
+  function applyStatus({ workflowState, stockStatus, checkedAt }) {
+    // Stock pill
+    const pill  = document.getElementById("stock-pill");
+    const label = document.getElementById("stock-label");
+    const sub   = document.getElementById("stock-sub");
+    pill.className = "stock-pill " + (stockStatus || "unknown");
+
+    if (stockStatus === "in_stock") {
+      label.textContent = "In Stock ✓";
+      sub.textContent   = '"Order Now" is live — buy immediately!';
+      if (prevStockStatus && prevStockStatus !== "in_stock") celebrate();
+    } else if (stockStatus === "out_of_stock") {
+      label.textContent = "Out of Stock";
+      sub.textContent   = "Watching closely — you'll be first to know";
+    } else {
+      label.textContent = stockStatus === "error" ? "Check error" : "Checking…";
+      sub.textContent   = "Will retry shortly";
+    }
+
+    // Monitor badge + buttons
+    const badge    = document.getElementById("monitor-badge");
+    const monLabel = document.getElementById("monitor-label");
+    const btnStart = document.getElementById("btn-start");
+    const btnStop  = document.getElementById("btn-stop");
+    const isActive = workflowState === "active";
+
+    badge.className = "monitor-badge " + (isActive ? "active" : "disabled");
+    monLabel.textContent = isActive
+      ? "Monitoring active — checking every minute"
+      : "Monitoring paused";
+
+    if (!controlBusy) {
+      btnStart.disabled = isActive;
+      btnStop.disabled  = !isActive;
+    }
+
+    document.getElementById("last-checked").textContent =
+      checkedAt ? `Last checked ${timeAgo(checkedAt)}` : "—";
+
+    addLog(
+      stockStatus === "in_stock"     ? "Status: IN STOCK 🎉" :
+      stockStatus === "out_of_stock" ? "Status: out of stock" :
+                                       "Status: " + stockStatus,
+      stockStatus === "in_stock" ? "ok" : stockStatus === "error" ? "err" : ""
+    );
+
+    prevStockStatus = stockStatus;
+  }
+
+  async function poll() {
+    try {
+      const res  = await fetch("/api/status?t=" + Date.now());
+      const data = await res.json();
+      applyStatus(data);
+    } catch (e) {
+      addLog("Fetch error: " + e.message, "err");
+    }
+  }
+
+  async function control(action) {
+    if (controlBusy) return;
+    controlBusy = true;
+    const btn = document.getElementById(action === "enable" ? "btn-start" : "btn-stop");
+    btn.classList.add("loading");
+    document.getElementById("btn-start").disabled = true;
+    document.getElementById("btn-stop").disabled  = true;
+
+    try {
+      const res  = await fetch("/api/control", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(action === "enable" ? "✓ Monitoring started" : "✓ Monitoring paused");
+        addLog(action === "enable" ? "Monitoring started" : "Monitoring paused", "info");
+        setTimeout(poll, 1500);
+      } else {
+        showToast(data.error || "Something went wrong", true);
+        addLog("Error: " + (data.error || "unknown"), "err");
+      }
+    } catch (e) {
+      showToast("Request failed", true);
+      addLog("Control error: " + e.message, "err");
+    } finally {
+      btn.classList.remove("loading");
+      controlBusy = false;
+    }
+  }
+
+  function celebrate() {
+    const colors = ["#1a6b3c","#a8d9bc","#1a1814","#f5c842","#f5f2eb"];
+    for (let i = 0; i < 60; i++) {
+      const el   = document.createElement("div");
+      const size = 5 + Math.random() * 7;
+      el.style.cssText = `
+        position:fixed; pointer-events:none; z-index:999;
+        left:${Math.random()*100}vw; top:-${size}px;
+        width:${size}px; height:${size}px;
+        background:${colors[Math.floor(Math.random()*colors.length)]};
+        border-radius:${Math.random()>.5?'50%':'2px'};
+        animation:confetti-fall ${1.5+Math.random()*2}s linear ${Math.random()*.5}s forwards;
+      `;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 4000);
+    }
+  }
+
+  // Boot
+  poll();
+  setInterval(poll, POLL_MS);
+</script>
+</body>
+</html>
