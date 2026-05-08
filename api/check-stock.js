@@ -29,9 +29,21 @@ async function fetchStockStatus() {
     if (!res.ok) return { status: "error", detail: `HTTP ${res.status}` };
 
     const html = (await res.text()).toLowerCase();
+    try {
+    const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (match) {
+      const data = JSON.parse(match[1]);
+      const productInfo = data?.props?.pageProps?.pageData?.data?.productInfo;
+      if (productInfo?.out_of_stock === false) stockStatus = "in_stock";
+      else if (productInfo?.out_of_stock === true) stockStatus = "out_of_stock";
+      else stockStatus = "unknown";
+    }
+  } catch (_) {
+    stockStatus = "error";
+  }
 
-    if (html.includes("order now"))  return { status: "in_stock" };
-    if (html.includes("notify me"))  return { status: "out_of_stock" };
+    // if (html.includes("order now"))  return { status: "in_stock" };
+    // if (html.includes("notify me"))  return { status: "out_of_stock" };
     return { status: "unknown", detail: "Neither button text found in HTML" };
 
   } catch (e) {
