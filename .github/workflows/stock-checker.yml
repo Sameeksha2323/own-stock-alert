@@ -1,23 +1,23 @@
+# # .github/workflows/stock-checker.yml
+# # 1. Runs every minute via cron
+# # 2. Checks OWN product page for "Order Now"
+# # 3. If in stock:
+# #    - Sends ONE email
+# #    - Starts Telegram loop: pings every 10s until user types STOP (or 30min limit)
+# #    - Disables itself after loop ends
+# # 4. Re-enable via dashboard "Start" button
 # .github/workflows/stock-checker.yml
-# 1. Runs every minute via cron
-# 2. Checks OWN product page for "Order Now"
-# 3. If in stock:
-#    - Sends ONE email
-#    - Starts Telegram loop: pings every 10s until user types STOP (or 30min limit)
-#    - Disables itself after loop ends
-# 4. Re-enable via dashboard "Start" button
-
 name: Stock Checker
 
 on:
   schedule:
-    - cron: "* * * * *"   # every minute, 24/7
-  workflow_dispatch:       # manual trigger from GitHub UI
+    - cron: "* * * * *"
+  workflow_dispatch:
 
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 35    # 30min alert loop + 5min buffer
+    timeout-minutes: 35
 
     steps:
       - name: Check stock + alert loop
@@ -25,7 +25,6 @@ jobs:
           #!/bin/bash
           set -e
 
-          # PRODUCT_URL="https://onlywhatsneeded.in/product/plant-coffee-1kg"
           PRODUCT_URL="https://onlywhatsneeded.in/product/whey-protein-2"
           PRODUCT_NAME="OWN Plant Protein Powder | Coffee | 1kg"
           VERCEL_URL="${{ secrets.VERCEL_URL }}"
@@ -58,30 +57,6 @@ jobs:
             echo "Not in stock yet. Exiting."
             exit 0
           fi
-          # ── STEP 1: Check stock ──────────────────────────────────────────
-          # echo "🔍 Checking stock..."
-
-          # HTML=$(curl -s -L \
-          #   -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" \
-          #   -H "Accept: text/html,application/xhtml+xml" \
-          #   -H "Accept-Language: en-IN,en;q=0.9" \
-          #   -H "Referer: https://onlywhatsneeded.in/" \
-          #   "$PRODUCT_URL")
-
-          # if echo "$HTML" | grep -qi "notify me"; then
-          #   STATUS="out_of_stock"
-          # elif echo "$HTML" | grep -qi "order now"; then
-          #   STATUS="in_stock"
-          # else
-          #   STATUS="unknown"
-          # fi
-
-          # echo "Stock status: $STATUS"
-
-          # if [ "$STATUS" != "in_stock" ]; then
-          #   echo "Not in stock yet. Exiting."
-          #   exit 0
-          # fi
 
           # ── STEP 2: IN STOCK — send one email ───────────────────────────
           echo "🚨 IN STOCK! Sending email..."
@@ -102,7 +77,6 @@ jobs:
           fi
 
           # ── STEP 3: Get current Telegram update_id baseline ─────────────
-          # We only want to react to STOP messages sent AFTER this moment.
           echo "📍 Getting Telegram update baseline..."
 
           UPDATES=$(curl -s "https://api.telegram.org/bot$BOT_TOKEN/getUpdates?limit=1&offset=-1")
@@ -124,7 +98,7 @@ jobs:
           # ── STEP 4: Telegram alert loop (every 10s, max 30 min) ─────────
           echo "📱 Starting Telegram alert loop..."
 
-          MAX_ITERATIONS=180   # 180 × 10s = 30 minutes max
+          MAX_ITERATIONS=180
           ITERATION=0
           STOPPED=false
 
@@ -137,10 +111,7 @@ jobs:
           }
 
           check_for_stop() {
-            # Fetch any new messages since our baseline
             UPDATES=$(curl -s "https://api.telegram.org/bot$BOT_TOKEN/getUpdates?offset=$OFFSET&timeout=0")
-            
-            # Check if any message contains "STOP" (case-insensitive)
             STOP_FOUND=$(echo "$UPDATES" | python3 -c "
           import sys, json
           try:
@@ -153,7 +124,6 @@ jobs:
                       break
               else:
                   print('no')
-              # Also print the new offset
               if results:
                   import sys
                   sys.stderr.write(str(results[-1]['update_id'] + 1))
@@ -161,7 +131,6 @@ jobs:
               print('no')
           " 2>/tmp/new_offset)
 
-            # Update offset so we don't re-read old messages
             NEW_OFFSET=$(cat /tmp/new_offset 2>/dev/null || echo "")
             if [ -n "$NEW_OFFSET" ]; then
               OFFSET=$NEW_OFFSET
@@ -173,45 +142,31 @@ jobs:
           # Send first alert immediately
           MSG="🚨 *IN STOCK NOW!*"$'\n\n'"*$PRODUCT_NAME* is available!"$'\n\n'"👉 [Order here]($PRODUCT_URL)"$'\n\n'"_Reply *STOP* to stop these alerts._"
           send_telegram "$MSG"
-          # send_telegram "🚨 *IN STOCK NOW!*
-          
-          # *$PRODUCT_NAME* is available!
-          
-          # 👉 [Order here]($PRODUCT_URL)
-          
-          # _Reply *STOP* to stop these alerts._"
-
-
           echo "✅ First Telegram message sent."
 
           while [ $ITERATION -lt $MAX_ITERATIONS ]; do
             sleep 10
             ITERATION=$((ITERATION + 1))
 
-            # Check for STOP before sending next message
             STOP_CHECK=$(check_for_stop)
 
             if [ "$STOP_CHECK" = "yes" ]; then
-              echo "🛑 STOP received from user after $ITERATION alerts. Stopping."
-              MSG="✅ *Alerts stopped.*"$'\n\n'"You typed STOP — no more notifications."$'\n\n'"Visit your dashboard to restart monitoring when needed."$'\n'"👉 $VERCEL_URL"
+              echo "🛑 STOP received after $ITERATION alerts. Stopping."
+              MSG="✅ *Alerts stopped.*"$'\n\n'"You typed STOP — no more notifications."$'\n\n'"Visit your dashboard to restart monitoring."$'\n'"👉 $VERCEL_URL"
               send_telegram "$MSG"
-              send_telegram "✅ *Alerts stopped.*
               STOPPED=true
               break
             fi
 
-            # Send next alert
-            MINS_LEFT=$((( (MAX_ITERATIONS - ITERATION) * 10 ) / 60))
+            MINS_LEFT=$(( ( (MAX_ITERATIONS - ITERATION) * 10 ) / 60 ))
             MSG="🚨 *Still in stock!* (alert #$((ITERATION + 1)))"$'\n\n'"*$PRODUCT_NAME* — go order now!"$'\n'"👉 [Order here]($PRODUCT_URL)"$'\n\n'"_Reply *STOP* to stop · Auto-stops in ~${MINS_LEFT}m_"
             send_telegram "$MSG"
-
             echo "Sent alert #$((ITERATION + 1))"
           done
 
-          # If loop ended naturally (not by STOP)
           if [ "$STOPPED" = "false" ]; then
             echo "⏱ 30-minute limit reached. Stopping alerts automatically."
-            MSG="⏱ *Auto-stopped after 30 minutes.*"$'\n\n'"Alerts have been paused. Visit your dashboard to check current stock status and restart monitoring."$'\n'"👉 $VERCEL_URL"
+            MSG="⏱ *Auto-stopped after 30 minutes.*"$'\n\n'"Alerts have been paused. Visit your dashboard to restart monitoring."$'\n'"👉 $VERCEL_URL"
             send_telegram "$MSG"
           fi
 
@@ -243,3 +198,240 @@ jobs:
           else
             echo "⚠️ Could not find workflow ID to disable."
           fi
+
+# name: Stock Checker
+
+# on:
+#   schedule:
+#     - cron: "* * * * *"   # every minute, 24/7
+#   workflow_dispatch:       # manual trigger from GitHub UI
+
+# jobs:
+#   check:
+#     runs-on: ubuntu-latest
+#     timeout-minutes: 35    # 30min alert loop + 5min buffer
+
+#     steps:
+#       - name: Check stock + alert loop
+#         run: |
+#           #!/bin/bash
+#           set -e
+
+#           # PRODUCT_URL="https://onlywhatsneeded.in/product/plant-coffee-1kg"
+#           PRODUCT_URL="https://onlywhatsneeded.in/product/whey-protein-2"
+#           PRODUCT_NAME="OWN Plant Protein Powder | Coffee | 1kg"
+#           VERCEL_URL="${{ secrets.VERCEL_URL }}"
+#           CRON_SECRET="${{ secrets.CRON_SECRET }}"
+#           BOT_TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}"
+#           CHAT_ID="${{ secrets.TELEGRAM_CHAT_ID }}"
+#           RESEND_KEY="${{ secrets.RESEND_API_KEY }}"
+#           ALERT_EMAIL="${{ secrets.ALERT_EMAIL }}"
+#           GH_PAT="${{ secrets.GH_PAT }}"
+#           GH_REPO="${{ github.repository }}"
+
+#           # ── STEP 1: Check stock ──────────────────────────────────────────
+#           echo "🔍 Checking stock..."
+
+#           RESPONSE=$(curl -s \
+#             -H "Authorization: Bearer $CRON_SECRET" \
+#             "$VERCEL_URL/api/check-stock")
+
+#           STATUS=$(echo "$RESPONSE" | python3 -c "
+#           import sys, json
+#           try:
+#               print(json.load(sys.stdin).get('status','unknown'))
+#           except:
+#               print('error')
+#           ")
+
+#           echo "Stock status: $STATUS"
+
+#           if [ "$STATUS" != "in_stock" ]; then
+#             echo "Not in stock yet. Exiting."
+#             exit 0
+#           fi
+#           # ── STEP 1: Check stock ──────────────────────────────────────────
+#           # echo "🔍 Checking stock..."
+
+#           # HTML=$(curl -s -L \
+#           #   -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" \
+#           #   -H "Accept: text/html,application/xhtml+xml" \
+#           #   -H "Accept-Language: en-IN,en;q=0.9" \
+#           #   -H "Referer: https://onlywhatsneeded.in/" \
+#           #   "$PRODUCT_URL")
+
+#           # if echo "$HTML" | grep -qi "notify me"; then
+#           #   STATUS="out_of_stock"
+#           # elif echo "$HTML" | grep -qi "order now"; then
+#           #   STATUS="in_stock"
+#           # else
+#           #   STATUS="unknown"
+#           # fi
+
+#           # echo "Stock status: $STATUS"
+
+#           # if [ "$STATUS" != "in_stock" ]; then
+#           #   echo "Not in stock yet. Exiting."
+#           #   exit 0
+#           # fi
+
+#           # ── STEP 2: IN STOCK — send one email ───────────────────────────
+#           echo "🚨 IN STOCK! Sending email..."
+
+#           if [ -n "$RESEND_KEY" ] && [ -n "$ALERT_EMAIL" ]; then
+#             curl -s -X POST "https://api.resend.com/emails" \
+#               -H "Authorization: Bearer $RESEND_KEY" \
+#               -H "Content-Type: application/json" \
+#               -d "{
+#                 \"from\": \"OWN Stock Alert <onboarding@resend.dev>\",
+#                 \"to\": [\"$ALERT_EMAIL\"],
+#                 \"subject\": \"🚨 IN STOCK NOW — $PRODUCT_NAME\",
+#                 \"html\": \"<div style='font-family:sans-serif;padding:32px'><h1>🎉 It's back in stock!</h1><p><strong>$PRODUCT_NAME</strong> is available right now.</p><br/><a href='$PRODUCT_URL' style='background:#16a34a;color:white;padding:14px 28px;border-radius:8px;text-decoration:none;font-size:18px;font-weight:bold;'>Order Now →</a><p style='color:#999;margin-top:24px;font-size:12px;'>Sent once by your OWN Stock Alert Agent. Reply STOP to your Telegram bot to stop alerts.</p></div>\"
+#               }" > /dev/null
+#             echo "✅ Email sent to $ALERT_EMAIL"
+#           else
+#             echo "⚠️ Email not configured, skipping."
+#           fi
+
+#           # ── STEP 3: Get current Telegram update_id baseline ─────────────
+#           # We only want to react to STOP messages sent AFTER this moment.
+#           echo "📍 Getting Telegram update baseline..."
+
+#           UPDATES=$(curl -s "https://api.telegram.org/bot$BOT_TOKEN/getUpdates?limit=1&offset=-1")
+#           LAST_UPDATE_ID=$(echo "$UPDATES" | python3 -c "
+#           import sys, json
+#           try:
+#               data = json.load(sys.stdin)
+#               results = data.get('result', [])
+#               if results:
+#                   print(results[-1]['update_id'])
+#               else:
+#                   print(0)
+#           except:
+#               print(0)
+#           ")
+#           echo "Baseline update_id: $LAST_UPDATE_ID"
+#           OFFSET=$((LAST_UPDATE_ID + 1))
+
+#           # ── STEP 4: Telegram alert loop (every 10s, max 30 min) ─────────
+#           echo "📱 Starting Telegram alert loop..."
+
+#           MAX_ITERATIONS=180   # 180 × 10s = 30 minutes max
+#           ITERATION=0
+#           STOPPED=false
+
+#           send_telegram() {
+#             local msg="$1"
+#             curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
+#               -d "chat_id=$CHAT_ID" \
+#               --data-urlencode "text=$msg" \
+#               -d "parse_mode=Markdown" > /dev/null
+#           }
+
+#           check_for_stop() {
+#             # Fetch any new messages since our baseline
+#             UPDATES=$(curl -s "https://api.telegram.org/bot$BOT_TOKEN/getUpdates?offset=$OFFSET&timeout=0")
+            
+#             # Check if any message contains "STOP" (case-insensitive)
+#             STOP_FOUND=$(echo "$UPDATES" | python3 -c "
+#           import sys, json
+#           try:
+#               data = json.load(sys.stdin)
+#               results = data.get('result', [])
+#               for r in results:
+#                   msg = r.get('message', {}).get('text', '').strip().upper()
+#                   if msg == 'STOP':
+#                       print('yes')
+#                       break
+#               else:
+#                   print('no')
+#               # Also print the new offset
+#               if results:
+#                   import sys
+#                   sys.stderr.write(str(results[-1]['update_id'] + 1))
+#           except:
+#               print('no')
+#           " 2>/tmp/new_offset)
+
+#             # Update offset so we don't re-read old messages
+#             NEW_OFFSET=$(cat /tmp/new_offset 2>/dev/null || echo "")
+#             if [ -n "$NEW_OFFSET" ]; then
+#               OFFSET=$NEW_OFFSET
+#             fi
+
+#             echo "$STOP_FOUND"
+#           }
+
+#           # Send first alert immediately
+#           MSG="🚨 *IN STOCK NOW!*"$'\n\n'"*$PRODUCT_NAME* is available!"$'\n\n'"👉 [Order here]($PRODUCT_URL)"$'\n\n'"_Reply *STOP* to stop these alerts._"
+#           send_telegram "$MSG"
+#           # send_telegram "🚨 *IN STOCK NOW!*
+          
+#           # *$PRODUCT_NAME* is available!
+          
+#           # 👉 [Order here]($PRODUCT_URL)
+          
+#           # _Reply *STOP* to stop these alerts._"
+
+
+#           echo "✅ First Telegram message sent."
+
+#           while [ $ITERATION -lt $MAX_ITERATIONS ]; do
+#             sleep 10
+#             ITERATION=$((ITERATION + 1))
+
+#             # Check for STOP before sending next message
+#             STOP_CHECK=$(check_for_stop)
+
+#             if [ "$STOP_CHECK" = "yes" ]; then
+#               echo "🛑 STOP received from user after $ITERATION alerts. Stopping."
+#               MSG="✅ *Alerts stopped.*"$'\n\n'"You typed STOP — no more notifications."$'\n\n'"Visit your dashboard to restart monitoring when needed."$'\n'"👉 $VERCEL_URL"
+#               send_telegram "$MSG"
+#               send_telegram "✅ *Alerts stopped.*
+#               STOPPED=true
+#               break
+#             fi
+
+#             # Send next alert
+#             MINS_LEFT=$((( (MAX_ITERATIONS - ITERATION) * 10 ) / 60))
+#             MSG="🚨 *Still in stock!* (alert #$((ITERATION + 1)))"$'\n\n'"*$PRODUCT_NAME* — go order now!"$'\n'"👉 [Order here]($PRODUCT_URL)"$'\n\n'"_Reply *STOP* to stop · Auto-stops in ~${MINS_LEFT}m_"
+#             send_telegram "$MSG"
+
+#             echo "Sent alert #$((ITERATION + 1))"
+#           done
+
+#           # If loop ended naturally (not by STOP)
+#           if [ "$STOPPED" = "false" ]; then
+#             echo "⏱ 30-minute limit reached. Stopping alerts automatically."
+#             MSG="⏱ *Auto-stopped after 30 minutes.*"$'\n\n'"Alerts have been paused. Visit your dashboard to check current stock status and restart monitoring."$'\n'"👉 $VERCEL_URL"
+#             send_telegram "$MSG"
+#           fi
+
+#           # ── STEP 5: Disable this workflow ───────────────────────────────
+#           echo "🔒 Disabling workflow..."
+
+#           WORKFLOW_ID=$(curl -s \
+#             -H "Authorization: Bearer $GH_PAT" \
+#             -H "Accept: application/vnd.github.v3+json" \
+#             "https://api.github.com/repos/$GH_REPO/actions/workflows" \
+#             | python3 -c "
+#           import sys, json
+#           try:
+#               workflows = json.load(sys.stdin).get('workflows', [])
+#               for w in workflows:
+#                   if w.get('name') == 'Stock Checker':
+#                       print(w['id'])
+#                       break
+#           except:
+#               pass
+#           ")
+
+#           if [ -n "$WORKFLOW_ID" ]; then
+#             curl -s -X PUT \
+#               -H "Authorization: Bearer $GH_PAT" \
+#               -H "Accept: application/vnd.github.v3+json" \
+#               "https://api.github.com/repos/$GH_REPO/actions/workflows/$WORKFLOW_ID/disable" > /dev/null
+#             echo "✅ Workflow disabled. Re-enable via dashboard."
+#           else
+#             echo "⚠️ Could not find workflow ID to disable."
+#           fi
