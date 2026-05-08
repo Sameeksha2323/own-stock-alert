@@ -10,8 +10,6 @@
 name: Stock Checker
 
 on:
-  schedule:
-    - cron: "* * * * *"
   workflow_dispatch:
 
 jobs:
