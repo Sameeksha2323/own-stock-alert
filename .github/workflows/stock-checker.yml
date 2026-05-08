@@ -38,43 +38,19 @@ jobs:
           GH_REPO="${{ github.repository }}"
 
           # ── STEP 1: Check stock ──────────────────────────────────────────
-          # echo "🔍 Checking stock..."
-
-          # RESPONSE=$(curl -s \
-          #   -H "Authorization: Bearer $CRON_SECRET" \
-          #   "$VERCEL_URL/api/check-stock")
-
-          # STATUS=$(echo "$RESPONSE" | python3 -c "
-          # import sys, json
-          # try:
-          #     print(json.load(sys.stdin).get('status','unknown'))
-          # except:
-          #     print('error')
-          # ")
-
-          # echo "Stock status: $STATUS"
-
-          # if [ "$STATUS" != "in_stock" ]; then
-          #   echo "Not in stock yet. Exiting."
-          #   exit 0
-          # fi
-          # ── STEP 1: Check stock ──────────────────────────────────────────
           echo "🔍 Checking stock..."
 
-          HTML=$(curl -s -L \
-            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" \
-            -H "Accept: text/html,application/xhtml+xml" \
-            -H "Accept-Language: en-IN,en;q=0.9" \
-            -H "Referer: https://onlywhatsneeded.in/" \
-            "$PRODUCT_URL")
+          RESPONSE=$(curl -s \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$VERCEL_URL/api/check-stock")
 
-          if echo "$HTML" | grep -qi "notify me"; then
-            STATUS="out_of_stock"
-          elif echo "$HTML" | grep -qi "order now"; then
-            STATUS="in_stock"
-          else
-            STATUS="unknown"
-          fi
+          STATUS=$(echo "$RESPONSE" | python3 -c "
+          import sys, json
+          try:
+              print(json.load(sys.stdin).get('status','unknown'))
+          except:
+              print('error')
+          ")
 
           echo "Stock status: $STATUS"
 
@@ -82,6 +58,30 @@ jobs:
             echo "Not in stock yet. Exiting."
             exit 0
           fi
+          # ── STEP 1: Check stock ──────────────────────────────────────────
+          # echo "🔍 Checking stock..."
+
+          # HTML=$(curl -s -L \
+          #   -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" \
+          #   -H "Accept: text/html,application/xhtml+xml" \
+          #   -H "Accept-Language: en-IN,en;q=0.9" \
+          #   -H "Referer: https://onlywhatsneeded.in/" \
+          #   "$PRODUCT_URL")
+
+          # if echo "$HTML" | grep -qi "notify me"; then
+          #   STATUS="out_of_stock"
+          # elif echo "$HTML" | grep -qi "order now"; then
+          #   STATUS="in_stock"
+          # else
+          #   STATUS="unknown"
+          # fi
+
+          # echo "Stock status: $STATUS"
+
+          # if [ "$STATUS" != "in_stock" ]; then
+          #   echo "Not in stock yet. Exiting."
+          #   exit 0
+          # fi
 
           # ── STEP 2: IN STOCK — send one email ───────────────────────────
           echo "🚨 IN STOCK! Sending email..."
