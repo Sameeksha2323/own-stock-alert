@@ -54,8 +54,18 @@ export default async function handler(req) {
       const html = (await res.text()).toLowerCase();
       // if (html.includes("order now"))  stockStatus = "in_stock";
       // else if (html.includes("notify me")) stockStatus = "out_of_stock";
-      if (html.includes("notify me"))       stockStatus = "out_of_stock";
-      else if (html.includes("order now")) stockStatus = "in_stock";
+      try {
+    const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (match) {
+      const data = JSON.parse(match[1]);
+      const productInfo = data?.props?.pageProps?.pageData?.data?.productInfo;
+      if (productInfo?.out_of_stock === false) stockStatus = "in_stock";
+      else if (productInfo?.out_of_stock === true) stockStatus = "out_of_stock";
+      else stockStatus = "unknown";
+    }
+  } catch (_) {
+    stockStatus = "error";
+  }
     }
   } catch (_) {
     stockStatus = "error";
