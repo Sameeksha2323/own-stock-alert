@@ -10,7 +10,7 @@ export default async function handler(req) {
   const vercelUrl = process.env.VERCEL_URL;
 
   // ── Check stock ────────────────────────────────────────────────────────
-  const stockRes = await fetch(`https://${vercelUrl}/api/check-stock`, {
+  const stockRes = await fetch(`${vercelUrl}/api/check-stock`, {
     headers: { "Authorization": `Bearer ${secret}` }
   });
   const { status } = await stockRes.json();
