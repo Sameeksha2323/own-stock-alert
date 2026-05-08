@@ -37,7 +37,8 @@ export default async function handler(req) {
   // ── Live stock check ─────────────────────────────────────────────────────
   try {
     const res = await fetch(
-      "https://onlywhatsneeded.in/product/plant-coffee-1kg",
+      // "https://onlywhatsneeded.in/product/plant-coffee-1kg",
+      "https://onlywhatsneeded.in/product/whey-protein-2",
       {
         headers: {
           "User-Agent":
