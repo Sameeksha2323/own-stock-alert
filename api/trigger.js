@@ -9,6 +9,17 @@ export default async function handler(req) {
   const repo   = process.env.GH_REPO;
   const vercelUrl = process.env.VERCEL_URL;
 
+  // Guard — fail clearly if env vars missing
+  if (!secret || !pat || !repo || !vercelUrl) {
+    return new Response(JSON.stringify({ 
+      error: "Missing env vars", 
+      missing: { secret: !secret, pat: !pat, repo: !repo, vercelUrl: !vercelUrl }
+    }), { 
+      status: 500,
+      headers: { "Content-Type": "application/json" } 
+    });
+  }
+
   // ── Check stock ────────────────────────────────────────────────────────
   const stockRes = await fetch(`${vercelUrl}/api/check-stock`, {
     headers: { "Authorization": `Bearer ${secret}` }
