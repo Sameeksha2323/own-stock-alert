@@ -36,27 +36,27 @@ jobs:
           GH_PAT="${{ secrets.GH_PAT }}"
           GH_REPO="${{ github.repository }}"
 
-          # ── STEP 1: Check stock ──────────────────────────────────────────
-          echo "🔍 Checking stock..."
+          # # ── STEP 1: Check stock ──────────────────────────────────────────
+          # echo "🔍 Checking stock..."
 
-          RESPONSE=$(curl -s \
-            -H "Authorization: Bearer $CRON_SECRET" \
-            "$VERCEL_URL/api/check-stock")
+          # RESPONSE=$(curl -s \
+          #   -H "Authorization: Bearer $CRON_SECRET" \
+          #   "$VERCEL_URL/api/check-stock")
 
-          STATUS=$(echo "$RESPONSE" | python3 -c "
-          import sys, json
-          try:
-              print(json.load(sys.stdin).get('status','unknown'))
-          except:
-              print('error')
-          ")
+          # STATUS=$(echo "$RESPONSE" | python3 -c "
+          # import sys, json
+          # try:
+          #     print(json.load(sys.stdin).get('status','unknown'))
+          # except:
+          #     print('error')
+          # ")
 
-          echo "Stock status: $STATUS"
+          # echo "Stock status: $STATUS"
 
-          if [ "$STATUS" != "in_stock" ]; then
-            echo "Not in stock yet. Exiting."
-            exit 0
-          fi
+          # if [ "$STATUS" != "in_stock" ]; then
+          #   echo "Not in stock yet. Exiting."
+          #   exit 0
+          # fi
 
           # ── STEP 2: IN STOCK — send one email ───────────────────────────
           echo "🚨 IN STOCK! Sending email..."
