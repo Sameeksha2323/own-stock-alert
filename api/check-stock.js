@@ -28,28 +28,66 @@ async function fetchStockStatus() {
 
     if (!res.ok) return { status: "error", detail: `HTTP ${res.status}` };
 
-    const html = (await res.text()).toLowerCase();
-    try {
-    const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-    if (match) {
-      const data = JSON.parse(match[1]);
-      const productInfo = data?.props?.pageProps?.pageData?.data?.productInfo;
-      if (productInfo?.out_of_stock === false) stockStatus = "in_stock";
-      else if (productInfo?.out_of_stock === true) stockStatus = "out_of_stock";
-      else stockStatus = "unknown";
-    }
-  } catch (_) {
-    stockStatus = "error";
-  }
+    const html = await res.text();
 
-    // if (html.includes("order now"))  return { status: "in_stock" };
-    // if (html.includes("notify me"))  return { status: "out_of_stock" };
-    return { status: "unknown", detail: "Neither button text found in HTML" };
+    try {
+      const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+      if (match) {
+        const data = JSON.parse(match[1]);
+        const productInfo = data?.props?.pageProps?.pageData?.data?.productInfo;
+        if (productInfo?.out_of_stock === false) return { status: "in_stock" };
+        else if (productInfo?.out_of_stock === true) return { status: "out_of_stock" };
+      }
+    } catch (_) {
+      return { status: "error", detail: "Failed to parse __NEXT_DATA__" };
+    }
+
+    return { status: "unknown", detail: "__NEXT_DATA__ not found or productInfo missing" };
 
   } catch (e) {
     return { status: "error", detail: String(e) };
   }
 }
+
+// async function fetchStockStatus() {
+//   try {
+//     const res = await fetch(PRODUCT_URL, {
+//       headers: {
+//         "User-Agent":
+//           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+//           "AppleWebKit/537.36 (KHTML, like Gecko) " +
+//           "Chrome/124.0.0.0 Safari/537.36",
+//         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+//         "Accept-Language": "en-IN,en;q=0.9",
+//         "Referer": "https://onlywhatsneeded.in/",
+//       },
+//       redirect: "follow",
+//     });
+
+//     if (!res.ok) return { status: "error", detail: `HTTP ${res.status}` };
+
+//     const html = (await res.text()).toLowerCase();
+//     try {
+//     const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+//     if (match) {
+//       const data = JSON.parse(match[1]);
+//       const productInfo = data?.props?.pageProps?.pageData?.data?.productInfo;
+//       if (productInfo?.out_of_stock === false) stockStatus = "in_stock";
+//       else if (productInfo?.out_of_stock === true) stockStatus = "out_of_stock";
+//       else stockStatus = "unknown";
+//     }
+//   } catch (_) {
+//     stockStatus = "error";
+//   }
+
+//     // if (html.includes("order now"))  return { status: "in_stock" };
+//     // if (html.includes("notify me"))  return { status: "out_of_stock" };
+//     return { status: "unknown", detail: "Neither button text found in HTML" };
+
+//   } catch (e) {
+//     return { status: "error", detail: String(e) };
+//   }
+// }
 
 export default async function handler(req) {
   // Verify secret — only GitHub Actions can call this
