@@ -8,8 +8,8 @@
 
 export const config = { runtime: "edge" };
 
-// const PRODUCT_URL  = "https://onlywhatsneeded.in/product/plant-coffee-1kg";
-const PRODUCT_URL  = "https://onlywhatsneeded.in/product/whey-protein-2";
+const PRODUCT_URL  = "https://onlywhatsneeded.in/product/plant-coffee-1kg";
+// const PRODUCT_URL  = "https://onlywhatsneeded.in/product/whey-protein-2";
 
 async function fetchStockStatus() {
   try {
