@@ -1,7 +1,4 @@
 // api/control.js
-// Called by dashboard Start / Stop buttons.
-// Enables or disables the "Stock Checker" GitHub Actions workflow.
-
 export const config = { runtime: "edge" };
 
 export default async function handler(req) {
@@ -21,17 +18,19 @@ export default async function handler(req) {
     return new Response("Invalid action — must be 'enable' or 'disable'", { status: 400 });
   }
 
-  const pat  = process.env.GH_PAT;
-  const repo = process.env.GH_REPO;   // e.g. "yourname/own-stock-alert"
+  const pat          = process.env.GH_PAT;
+  const repo         = process.env.GH_REPO;
+  const cronApiKey   = process.env.CRONJOB_API_KEY;
+  const cronJobId    = process.env.CRONJOB_ID;
 
-  if (!pat || !repo) {
+  if (!pat || !repo || !cronApiKey || !cronJobId) {
     return new Response(
-      JSON.stringify({ error: "GH_PAT or GH_REPO not configured in Vercel env vars" }),
+      JSON.stringify({ error: "Missing env vars", missing: { pat: !pat, repo: !repo, cronApiKey: !cronApiKey, cronJobId: !cronJobId } }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 
-  // Get the workflow ID for "Stock Checker"
+  // ── GitHub: enable/disable workflow ─────────────────────────────────────
   const listRes = await fetch(
     `https://api.github.com/repos/${repo}/actions/workflows`,
     {
@@ -55,14 +54,14 @@ export default async function handler(req) {
 
   if (!workflow) {
     return new Response(
-      JSON.stringify({ error: "Workflow named 'Stock Checker' not found in repo" }),
+      JSON.stringify({ error: "Workflow 'Stock Checker' not found" }),
       { status: 404, headers: { "Content-Type": "application/json" } }
     );
   }
 
-  // Enable or disable
+  const ghAction = action === "enable" ? "enable" : "disable";
   const actionRes = await fetch(
-    `https://api.github.com/repos/${repo}/actions/workflows/${workflow.id}/${action}`,
+    `https://api.github.com/repos/${repo}/actions/workflows/${workflow.id}/${ghAction}`,
     {
       method: "PUT",
       headers: {
@@ -75,13 +74,35 @@ export default async function handler(req) {
 
   if (!actionRes.ok) {
     return new Response(
-      JSON.stringify({ error: `Failed to ${action} workflow: ${actionRes.status}` }),
+      JSON.stringify({ error: `Failed to ${ghAction} GitHub workflow: ${actionRes.status}` }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  // ── cron-job.org: pause/resume ───────────────────────────────────────────
+  // enabled: true = running, false = paused
+  const cronEnabled = action === "enable";
+  const cronRes = await fetch(
+    `https://api.cron-job.org/jobs/${cronJobId}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Authorization": `Bearer ${cronApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ job: { enabled: cronEnabled } }),
+    }
+  );
+
+  if (!cronRes.ok) {
+    return new Response(
+      JSON.stringify({ error: `Failed to ${action} cron-job: ${cronRes.status}` }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 
   return new Response(
-    JSON.stringify({ success: true, action, workflowId: workflow.id }),
+    JSON.stringify({ success: true, action, workflowId: workflow.id, cronJobId }),
     {
       headers: {
         "Content-Type": "application/json",
