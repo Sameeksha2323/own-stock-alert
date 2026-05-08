@@ -1,13 +1,12 @@
+// // api/status.js
+// // Polled by the dashboard every 30s.
+// // Returns: live stock status + whether the workflow is active or disabled.
 // api/status.js
-// Polled by the dashboard every 30s.
-// Returns: live stock status + whether the workflow is active or disabled.
-
 export const config = { runtime: "edge" };
 
 export default async function handler(req) {
   const pat  = process.env.GH_PAT;
   const repo = process.env.GH_REPO;
-
   let workflowState = "unknown";
   let stockStatus   = "unknown";
 
@@ -37,7 +36,6 @@ export default async function handler(req) {
   // ── Live stock check ─────────────────────────────────────────────────────
   try {
     const res = await fetch(
-      // "https://onlywhatsneeded.in/product/plant-coffee-1kg",
       "https://onlywhatsneeded.in/product/whey-protein-2",
       {
         headers: {
@@ -51,21 +49,19 @@ export default async function handler(req) {
       }
     );
     if (res.ok) {
-      const html = (await res.text()).toLowerCase();
-      // if (html.includes("order now"))  stockStatus = "in_stock";
-      // else if (html.includes("notify me")) stockStatus = "out_of_stock";
+      const html = await res.text();  // ← removed .toLowerCase()
       try {
-    const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-    if (match) {
-      const data = JSON.parse(match[1]);
-      const productInfo = data?.props?.pageProps?.pageData?.data?.productInfo;
-      if (productInfo?.out_of_stock === false) stockStatus = "in_stock";
-      else if (productInfo?.out_of_stock === true) stockStatus = "out_of_stock";
-      else stockStatus = "unknown";
-    }
-  } catch (_) {
-    stockStatus = "error";
-  }
+        const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+        if (match) {
+          const data = JSON.parse(match[1]);
+          const productInfo = data?.props?.pageProps?.pageData?.data?.productInfo;
+          if (productInfo?.out_of_stock === false) stockStatus = "in_stock";
+          else if (productInfo?.out_of_stock === true) stockStatus = "out_of_stock";
+          else stockStatus = "unknown";
+        }
+      } catch (_) {
+        stockStatus = "error";
+      }
     }
   } catch (_) {
     stockStatus = "error";
@@ -73,8 +69,8 @@ export default async function handler(req) {
 
   return new Response(
     JSON.stringify({
-      workflowState,    // "active" | "disabled" | "unknown"
-      stockStatus,      // "in_stock" | "out_of_stock" | "unknown" | "error"
+      workflowState,
+      stockStatus,
       checkedAt: new Date().toISOString(),
     }),
     {
@@ -86,3 +82,88 @@ export default async function handler(req) {
     }
   );
 }
+
+// export const config = { runtime: "edge" };
+
+// export default async function handler(req) {
+//   const pat  = process.env.GH_PAT;
+//   const repo = process.env.GH_REPO;
+
+//   let workflowState = "unknown";
+//   let stockStatus   = "unknown";
+
+//   // ── Workflow state from GitHub ───────────────────────────────────────────
+//   if (pat && repo) {
+//     try {
+//       const res = await fetch(
+//         `https://api.github.com/repos/${repo}/actions/workflows`,
+//         {
+//           headers: {
+//             "Authorization": `Bearer ${pat}`,
+//             "Accept": "application/vnd.github.v3+json",
+//             "User-Agent": "OWN-Stock-Alert",
+//           },
+//         }
+//       );
+//       if (res.ok) {
+//         const { workflows } = await res.json();
+//         const wf = workflows.find(w => w.name === "Stock Checker");
+//         workflowState = wf ? wf.state : "not_found";
+//       }
+//     } catch (_) {
+//       workflowState = "error";
+//     }
+//   }
+
+//   // ── Live stock check ─────────────────────────────────────────────────────
+//   try {
+//     const res = await fetch(
+//       // "https://onlywhatsneeded.in/product/plant-coffee-1kg",
+//       "https://onlywhatsneeded.in/product/whey-protein-2",
+//       {
+//         headers: {
+//           "User-Agent":
+//             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
+//             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36",
+//           "Accept": "text/html,application/xhtml+xml",
+//           "Accept-Language": "en-IN,en;q=0.9",
+//           "Referer": "https://onlywhatsneeded.in/",
+//         },
+//       }
+//     );
+//     if (res.ok) {
+//       const html = (await res.text()).toLowerCase();
+//       // if (html.includes("order now"))  stockStatus = "in_stock";
+//       // else if (html.includes("notify me")) stockStatus = "out_of_stock";
+//       try {
+//     const match = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+//     if (match) {
+//       const data = JSON.parse(match[1]);
+//       const productInfo = data?.props?.pageProps?.pageData?.data?.productInfo;
+//       if (productInfo?.out_of_stock === false) stockStatus = "in_stock";
+//       else if (productInfo?.out_of_stock === true) stockStatus = "out_of_stock";
+//       else stockStatus = "unknown";
+//     }
+//   } catch (_) {
+//     stockStatus = "error";
+//   }
+//     }
+//   } catch (_) {
+//     stockStatus = "error";
+//   }
+
+//   return new Response(
+//     JSON.stringify({
+//       workflowState,    // "active" | "disabled" | "unknown"
+//       stockStatus,      // "in_stock" | "out_of_stock" | "unknown" | "error"
+//       checkedAt: new Date().toISOString(),
+//     }),
+//     {
+//       headers: {
+//         "Content-Type": "application/json",
+//         "Access-Control-Allow-Origin": "*",
+//         "Cache-Control": "no-store",
+//       },
+//     }
+//   );
+// }
